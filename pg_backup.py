@@ -2,9 +2,11 @@
 
 import subprocess
 import datetime
+import os
+import sys
+
 import boto3
 import secrets
-import os, sys
 
 
 dump_name = secrets.DATABASE_DUMP_NAME

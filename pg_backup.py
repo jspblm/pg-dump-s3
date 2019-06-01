@@ -4,12 +4,14 @@ import subprocess
 import datetime
 import os
 import sys
+import gzip
+import shutil
 
 import boto3
 import secrets
 
-
 dump_name = secrets.DATABASE_DUMP_NAME
+dump_name_gz = '%s.gz' % (dump_name,)
 db_name = secrets.DATABASE_NAME
 email_origin = secrets.EMAIL_ORIGIN
 email_destination = secrets.EMAIL_DESTINATION
@@ -23,6 +25,11 @@ if dump.stdout:
     print('[ERROR]', dump.stdout)
     sys.exit(1)
 
+# Compress file
+with open('%s/%s' % (cwd, dump_name), 'rb') as f_in:
+    with gzip.open('%s/%s' % (cwd, dump_name_gz), 'wb') as f_out:
+        shutil.copyfileobj(f_in, f_out)
+
 s3 = boto3.client(
     's3',
     aws_access_key_id=secrets.ACCESS_KEY,
@@ -31,8 +38,11 @@ s3 = boto3.client(
 
 date = datetime.datetime.utcnow()
 
-s3.upload_file(dump_name, secrets.BUCKET_NAME, '%s-%s-UTC.sql' % (db_name, date.strftime('%Y-%m-%dT%H')))
+# Send the compressed file
+s3_key = '%s-%s-UTC.sql.gz' % (db_name, date.strftime('%Y-%m-%dT%H%M'))
+s3_result = s3.upload_file(dump_name_gz, secrets.BUCKET_NAME, s3_key)
 
+# Send a confirmation email
 ses = boto3.client(
     'ses',
     aws_access_key_id=secrets.ACCESS_KEY,
@@ -53,15 +63,16 @@ ses_response = ses.send_email(
         },
         'Body': {
             'Text': {
-                'Data': 'Backup for database %s ok at %s UTC' % (db_name, date.strftime('%Y-%m-%dT%H:%M:%S'),),
+                'Data': 'Backup for database %s ok at %s UTC - S3 Key: %s' %
+                        (db_name, date.strftime('%Y-%m-%dT%H:%M:%S'), s3_key),
                 'Charset': 'utf-8'
             }
         }
     }
 )
 
-
+# Remove the files in the local drive
 os.remove('%s/%s' % (cwd, dump_name))
+os.remove('%s/%s' % (cwd, dump_name_gz))
 
 sys.exit(0)
-

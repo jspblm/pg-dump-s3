@@ -18,6 +18,6 @@ EMAIL_ORIGIN = '<aws-ses-confirmed-email>'
 EMAIL_DESTINATION = ['<list-of-destination-emails>']
 ```  
 
-Install boto3: `pip install boto3`  
+Install boto3: `pip install boto3==1.5.1`  
 
 And run with command: `python3 pg_backup.py`  
